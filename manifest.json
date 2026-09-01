@@ -1,7 +1,7 @@
 {
   "manifest_version": 3,
   "name": "Nice GitHub",
-  "version": "0.4.0",
+  "version": "0.5.0",
   "description": "Makes GitHub pull request diffs easier to review.",
   "host_permissions": [
     "https://github.com/*"
@@ -15,7 +15,9 @@
         "diff-url.js",
         "content.js",
         "file-filters.js",
-        "file-filters-ui.js"
+        "file-filters-ui.js",
+        "last-commit.js",
+        "last-commit-ui.js"
       ],
       "run_at": "document_start"
     },

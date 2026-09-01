@@ -26,6 +26,10 @@ generated files**. Tests match `*.test.*` and `_test.*` (so `foo.test.ts` and
 Both choices default on and are stored in `chrome.storage.sync` so they apply
 on every repo.
 
+Each file's overflow menu (the `...` next to Viewed) also gets **Last commit**,
+which opens the most recent commit that modified that file on the pull request
+head.
+
 ## Install locally
 
 1. Open `chrome://extensions` in Chrome.
