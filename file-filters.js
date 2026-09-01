@@ -47,6 +47,14 @@
     );
   }
 
+  function hiddenCountLabel(kind, count) {
+    const n = Number(count) || 0;
+    if (kind === "tests") {
+      return n === 1 ? "1 test hidden" : n + " tests hidden";
+    }
+    return n === 1 ? "1 generated file hidden" : n + " generated files hidden";
+  }
+
   global.NiceGithubFileFilters = {
     STORAGE_KEYS,
     DEFAULTS,
@@ -54,6 +62,7 @@
     basename,
     isTestPath,
     isGeneratedElement,
+    hiddenCountLabel,
   };
 
   if (typeof module !== "undefined") {

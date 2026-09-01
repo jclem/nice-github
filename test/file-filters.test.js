@@ -28,3 +28,12 @@ const { normalizePath } = require("../file-filters.js");
 test("normalizePath strips LRM marks GitHub wraps around file names", () => {
   assert.equal(normalizePath("\u200epkg/cmd/repo/create/create_test.go\u200e"), "pkg/cmd/repo/create/create_test.go");
 });
+
+const { hiddenCountLabel } = require("../file-filters.js");
+
+test("hiddenCountLabel pluralizes tests and generated files", () => {
+  assert.equal(hiddenCountLabel("tests", 1), "1 test hidden");
+  assert.equal(hiddenCountLabel("tests", 2), "2 tests hidden");
+  assert.equal(hiddenCountLabel("generated", 1), "1 generated file hidden");
+  assert.equal(hiddenCountLabel("generated", 3), "3 generated files hidden");
+});

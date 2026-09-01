@@ -26,6 +26,10 @@ generated files**. Tests match `*.test.*` and `_test.*` (so `foo.test.ts` and
 Both choices default on and are stored in `chrome.storage.sync` so they apply
 on every repo.
 
+When files are hidden, the PR file tree shows a count for each type (tests,
+generated). Clicking the × on a count turns that filter off and shows those
+files again.
+
 Each file's overflow menu (the `...` next to Viewed) also gets **Last commit**,
 which opens the most recent commit that modified that file on the pull request
 head.

@@ -28,6 +28,33 @@
       "[" + ITEM_ATTR + '][aria-checked="false"] [data-component="ActionList.Selection"]{',
       "visibility:hidden;",
       "}",
+      "#nice-github-hidden-summary{",
+      "display:flex;",
+      "flex-wrap:wrap;",
+      "gap:6px;",
+      "padding:8px 12px 4px;",
+      "}",
+      ".nice-github-hidden-chip{",
+      "display:inline-flex;",
+      "align-items:center;",
+      "gap:4px;",
+      "font-size:12px;",
+      "line-height:1.2;",
+      "color:var(--fgColor-muted,#59636e);",
+      "background:var(--bgColor-muted,#f6f8fa);",
+      "border:1px solid var(--borderColor-muted,#d1d9e0);",
+      "border-radius:999px;",
+      "padding:2px 6px 2px 8px;",
+      "}",
+      ".nice-github-hidden-chip button{",
+      "border:0;",
+      "background:transparent;",
+      "color:inherit;",
+      "cursor:pointer;",
+      "padding:0 2px;",
+      "font-size:14px;",
+      "line-height:1;",
+      "}",
     ].join("");
     (document.head || document.documentElement).appendChild(style);
   }
@@ -124,6 +151,7 @@
     }
 
     if (!state.hideTests && !state.hideGenerated) {
+      renderHiddenSummary();
       return;
     }
 
@@ -150,6 +178,142 @@
         hidePair(item, card);
       }
     }
+
+    renderHiddenSummary();
+  }
+
+  const SUMMARY_ID = "nice-github-hidden-summary";
+  let lastCounts = { tests: -1, generated: -1 };
+
+  function countHidden() {
+    const tests = new Set();
+    const generated = new Set();
+
+    const cards = document.querySelectorAll('div[role="region"][id^="diff-"].' + HIDDEN_CLASS);
+    for (const card of cards) {
+      const path = pathFromDiffCard(card);
+      if (path && filters.isTestPath(path)) {
+        tests.add(path);
+      }
+      if (isGeneratedCard(card)) {
+        generated.add(path || card.id);
+      }
+    }
+
+    const leaves = document.querySelectorAll("#pr-file-tree li[role='treeitem']." + HIDDEN_CLASS);
+    for (const item of leaves) {
+      if (!isTreeLeaf(item)) {
+        continue;
+      }
+      const path = pathFromTreeItem(item);
+      if (path && filters.isTestPath(path)) {
+        tests.add(path);
+      }
+      const card = diffCardForTreeItem(item);
+      if (card && isGeneratedCard(card)) {
+        generated.add(path || item.id);
+      }
+    }
+
+    return { tests: tests.size, generated: generated.size };
+  }
+
+  function syncMenuChecks() {
+    const testsItem = document.querySelector("[" + ITEM_ATTR + '="hideTests"]');
+    const list = testsItem?.closest("ul");
+    if (!list) {
+      return;
+    }
+    setItemChecked(checkedControl(list, "hideTests"), state.hideTests);
+    setItemChecked(checkedControl(list, "hideGenerated"), state.hideGenerated);
+  }
+
+  function setHide(key, value) {
+    state[key] = value;
+    persist();
+    applyFilters(document);
+    syncMenuChecks();
+  }
+
+  function makeChip(hideKey, kind, count) {
+    const chip = document.createElement("span");
+    chip.className = "nice-github-hidden-chip";
+    chip.setAttribute("data-nice-github-chip", kind);
+
+    const label = document.createElement("span");
+    label.textContent = filters.hiddenCountLabel(kind, count);
+    chip.appendChild(label);
+
+    const button = document.createElement("button");
+    button.type = "button";
+    button.setAttribute("aria-label", kind === "tests" ? "Show tests" : "Show generated files");
+    button.textContent = "×";
+    button.addEventListener("click", (event) => {
+      event.preventDefault();
+      event.stopPropagation();
+      setHide(hideKey, false);
+    });
+    chip.appendChild(button);
+    return chip;
+  }
+
+  function summaryAnchor() {
+    const pane = document.getElementById("pr-file-tree");
+    if (!pane) {
+      return null;
+    }
+    return (
+      pane.querySelector('[class*="FileTreeScrollable"]') ||
+      pane.querySelector('ul[role="tree"]')
+    );
+  }
+
+  function renderHiddenSummary() {
+    const anchor = summaryAnchor();
+    if (!anchor || !anchor.parentElement) {
+      return;
+    }
+
+    const counts = countHidden();
+    let bar = document.getElementById(SUMMARY_ID);
+    if (!counts.tests && !counts.generated) {
+      if (bar) {
+        mutating = true;
+        bar.remove();
+        mutating = false;
+      }
+      lastCounts = counts;
+      return;
+    }
+
+    if (!bar) {
+      bar = document.createElement("div");
+      bar.id = SUMMARY_ID;
+    }
+    if (bar.nextElementSibling !== anchor) {
+      mutating = true;
+      anchor.parentElement.insertBefore(bar, anchor);
+      mutating = false;
+    }
+
+    if (
+      counts.tests === lastCounts.tests &&
+      counts.generated === lastCounts.generated &&
+      bar.childElementCount > 0
+    ) {
+      return;
+    }
+
+    lastCounts = counts;
+    mutating = true;
+    bar.replaceChildren();
+    if (counts.tests) {
+      bar.appendChild(makeChip("hideTests", "tests", counts.tests));
+    }
+    if (counts.generated) {
+      bar.appendChild(makeChip("hideGenerated", "generated", counts.generated));
+    }
+    mutating = false;
   }
 
   function itemLabel(node) {
@@ -274,10 +438,7 @@
       "Hide tests",
       state.hideTests,
       () => {
-        state.hideTests = !state.hideTests;
-        persist();
-        applyFilters(document);
-        setItemChecked(checkedControl(list, "hideTests"), state.hideTests);
+        setHide("hideTests", !state.hideTests);
       },
     );
     const generatedItem = makeFilterItem(
@@ -286,10 +447,7 @@
       "Hide generated files",
       state.hideGenerated,
       () => {
-        state.hideGenerated = !state.hideGenerated;
-        persist();
-        applyFilters(document);
-        setItemChecked(checkedControl(list, "hideGenerated"), state.hideGenerated);
+        setHide("hideGenerated", !state.hideGenerated);
       },
     );
 
