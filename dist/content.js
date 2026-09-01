@@ -1,5 +1,42 @@
 var NiceGithubContent = (function(exports) {
   "use strict";
+  const CHROME_HIDE_STYLE_ID = "nice-github-chrome-hide";
+  const HEADER = ':is(header.GlobalNav, header.AppHeader, header[role="banner"])';
+  const CHROME_HIDE_CSS = [
+    /* Copilot link + caret (hashed BEM suffix omitted). */
+    `${HEADER} [class*="CopilotItems-module__Wrapper"]:has(a[href="/copilot"])`,
+    `${HEADER} .AppHeader-CopilotChat`,
+    `${HEADER} a[href="/copilot"]`,
+    `${HEADER} button[class*="CopilotItems-module__CopilotMenu"]`,
+    /* Agents (cloud / lightning) */
+    `${HEADER} [class*="CopilotItems-module__Wrapper"]:has(#global-copilot-agent-button)`,
+    `${HEADER} #global-copilot-agent-button`,
+    `${HEADER} button[aria-label="Open agents panel"]`,
+    /* Create new + */
+    `${HEADER} button[class*="GlobalCreateMenu-module__actionMenuButton"]`,
+    `${HEADER} [class*="GlobalCreateMenu-module__responsiveCreateMenu"]`,
+    `${HEADER} #global-create-menu-anchor`,
+    `${HEADER} [aria-label^="Create new"]`,
+    /* Global Issues / Pull requests / Repositories */
+    `${HEADER} .hide-sm.hide-md:has(a[href="/repos"])`,
+    `${HEADER} a[href="/issues"]`,
+    `${HEADER} a[href="/pulls"]`,
+    `${HEADER} a[href="/repos"]`,
+    `${HEADER} a[href$="?tab=repositories"]`,
+    /* Repo UnderlineNav Agents tab — not Issues / Pull requests */
+    'nav[aria-label="Repository"] li:has(> a[data-tab-item="agents"])',
+    'nav[aria-label="Repository"] li:has(> a[data-react-nav="repo-agents"])',
+    'nav[aria-label="Repository"] li:has(svg.octicon-agent)'
+  ].map((selector) => selector + "{display:none !important;}").join("");
+  function bootChromeHide() {
+    if (document.getElementById(CHROME_HIDE_STYLE_ID)) {
+      return;
+    }
+    const style = document.createElement("style");
+    style.id = CHROME_HIDE_STYLE_ID;
+    style.textContent = CHROME_HIDE_CSS;
+    (document.head || document.documentElement).appendChild(style);
+  }
   const PR_FILES_PATH = /^\/[^/]+\/[^/]+\/pull\/\d+\/(?:changes|files)\/?$/;
   function isPullRequestFilesUrl(value) {
     const url = value instanceof URL ? value : new URL(value);
@@ -1429,6 +1466,7 @@ var NiceGithubContent = (function(exports) {
       rewriteDiffLinks();
     });
   }
+  bootChromeHide();
   bootContent();
   bootFileFilters();
   bootFileMenu();

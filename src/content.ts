@@ -1,3 +1,4 @@
+import { bootChromeHide } from "./chrome-hide";
 import { withWhitespaceHidden } from "./diff-url";
 import { bootFileFilters } from "./file-filters-ui";
 import { bootFileMenu } from "./last-commit-ui";
@@ -72,6 +73,7 @@ export function bootContent(): void {
   });
 }
 
+bootChromeHide();
 bootContent();
 bootFileFilters();
 bootFileMenu();

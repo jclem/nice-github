@@ -41,6 +41,10 @@ Each file's overflow menu (the `...` next to Viewed) also gets **Last commit**,
 which opens the most recent commit that modified that file on the pull request
 head.
 
+The global site header hides Copilot, Agents, Create new, Issues, Pull
+requests, and Repositories. Search, inbox, and the avatar stay. On a
+repository, the Agents tab is hidden; other repo tabs stay.
+
 ## Install locally
 
 1. Run `npm install` and `npm run build` in this repository.
