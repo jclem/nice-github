@@ -1,6 +1,6 @@
-const assert = require("node:assert/strict");
-const test = require("node:test");
-const lastCommit = require("../last-commit.js");
+import assert from "node:assert/strict";
+import { test } from "vitest";
+import * as lastCommit from "../src/last-commit";
 
 test("parsePrLocation accepts Files changed routes", () => {
   assert.deepEqual(

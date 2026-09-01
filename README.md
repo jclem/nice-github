@@ -2,6 +2,10 @@
 
 A small Manifest V3 Chrome extension for GitHub pull-request reviews.
 
+TypeScript sources live in `src/`. Vite bundles them into `dist/` as two IIFE
+content scripts (`content.js` in the isolated world, `turbo-navigation.js` in
+the MAIN world).
+
 ## Current behavior
 
 Whenever a GitHub pull request's **Files changed** page is opened, the
@@ -22,8 +26,8 @@ for an individual link.
 
 The Files changed gear menu (Layout) also gets hide toggles for **tests**,
 **generated files**, **deleted files**, and **rename-only files**. **Add glob**
-adds an editable path pattern for this repo. Each glob is its own line with
-an × to remove it. Tests
+adds an editable path pattern for this repo (typed in the menu; there is no
+`window.prompt`). Each glob is its own line with an × to remove it. Tests
 match `*.test.*` and `_test.*`. Generated files are ones GitHub already marks
 as generated. Every hide option defaults off and is stored per repository.
 
@@ -39,10 +43,11 @@ head.
 
 ## Install locally
 
-1. Open `chrome://extensions` in Chrome.
-2. Enable **Developer mode**.
-3. Select **Load unpacked** and choose this repository directory.
-4. Open any URL like `https://github.com/OWNER/REPOSITORY/pull/123/files`.
+1. Run `npm install` and `npm run build` in this repository.
+2. Open `chrome://extensions` in Chrome.
+3. Enable **Developer mode**.
+4. Select **Load unpacked** and choose the `dist/` directory.
+5. Open any URL like `https://github.com/OWNER/REPOSITORY/pull/123/files`.
 
 The extension only requests access to `github.com`; it does not run a
 background service worker.

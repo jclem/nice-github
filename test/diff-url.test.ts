@@ -1,6 +1,6 @@
-const assert = require("node:assert/strict");
-const test = require("node:test");
-const { isPullRequestFilesUrl, withWhitespaceHidden } = require("../diff-url.js");
+import assert from "node:assert/strict";
+import { test } from "vitest";
+import { isPullRequestFilesUrl, withWhitespaceHidden } from "../src/diff-url";
 
 test("adds GitHub's whitespace query parameter to the current Files changed route", () => {
   assert.equal(

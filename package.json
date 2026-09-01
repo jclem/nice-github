@@ -1,0 +1,18 @@
+{
+  "name": "nice-github",
+  "version": "0.8.0",
+  "private": true,
+  "type": "module",
+  "description": "Makes GitHub pull request diffs easier to review.",
+  "scripts": {
+    "build": "vite build --config vite.content.config.ts && vite build --config vite.turbo.config.ts",
+    "test": "vitest run"
+  },
+  "devDependencies": {
+    "@types/chrome": "^0.1.24",
+    "@types/node": "^24.3.0",
+    "typescript": "^5.9.2",
+    "vite": "^7.1.3",
+    "vitest": "^3.2.4"
+  }
+}

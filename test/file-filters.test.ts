@@ -1,6 +1,6 @@
-const assert = require("node:assert/strict");
-const test = require("node:test");
-const filters = require("../file-filters.js");
+import assert from "node:assert/strict";
+import { test } from "vitest";
+import * as filters from "../src/file-filters";
 
 test("*.test.* matches typical JS/TS test files", () => {
   assert.equal(filters.isTestPath("src/foo.test.ts"), true);
