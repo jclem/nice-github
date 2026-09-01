@@ -20,6 +20,12 @@ Other query parameters (for example a selected file anchor) are preserved. An
 explicit `w=0` is respected, making it possible to opt into showing whitespace
 for an individual link.
 
+The Files changed gear menu (Layout) also gets **Hide tests** and **Hide
+generated files**. Tests match `*.test.*` and `_test.*` (so `foo.test.ts` and
+`foo_test.go`). Generated files are ones GitHub already marks as generated.
+Both choices default on and are stored in `chrome.storage.sync` so they apply
+on every repo.
+
 ## Install locally
 
 1. Open `chrome://extensions` in Chrome.

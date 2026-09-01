@@ -1,20 +1,36 @@
 {
   "manifest_version": 3,
   "name": "Nice GitHub",
-  "version": "0.3.0",
+  "version": "0.4.0",
   "description": "Makes GitHub pull request diffs easier to review.",
-  "host_permissions": ["https://github.com/*"],
+  "host_permissions": [
+    "https://github.com/*"
+  ],
   "content_scripts": [
     {
-      "matches": ["https://github.com/*"],
-      "js": ["diff-url.js", "content.js"],
+      "matches": [
+        "https://github.com/*"
+      ],
+      "js": [
+        "diff-url.js",
+        "content.js",
+        "file-filters.js",
+        "file-filters-ui.js"
+      ],
       "run_at": "document_start"
     },
     {
-      "matches": ["https://github.com/*"],
-      "js": ["turbo-navigation.js"],
+      "matches": [
+        "https://github.com/*"
+      ],
+      "js": [
+        "turbo-navigation.js"
+      ],
       "run_at": "document_start",
       "world": "MAIN"
     }
+  ],
+  "permissions": [
+    "storage"
   ]
 }
