@@ -10,6 +10,12 @@
   const COMMIT_ICON =
     "M11.93 8.5a4.002 4.002 0 0 1-7.86 0H.75a.75.75 0 0 1 0-1.5h3.32a4.002 4.002 0 0 1 7.86 0h3.32a.75.75 0 0 1 0 1.5Zm-1.43-.75a2.5 2.5 0 1 0-5 0 2.5 2.5 0 0 0 5 0Z";
 
+  const COPY_ICON =
+    "M0 6.75C0 5.784.784 5 1.75 5h1.5a.75.75 0 1 1 0 1.5h-1.5a.25.25 0 0 0-.25.25v7.5c0 .138.112.25.25.25h7.5a.25.25 0 0 0 .25-.25v-1.5a.75.75 0 0 1 1.5 0v1.5A1.75 1.75 0 0 1 9.25 16h-7.5A1.75 1.75 0 0 1 0 14.25Z M5 1.75C5 .784 5.784 0 6.75 0h7.5C15.216 0 16 .784 16 1.75v7.5A1.75 1.75 0 0 1 14.25 11h-7.5A1.75 1.75 0 0 1 5 9.25Zm1.75-.25a.25.25 0 0 0-.25.25v7.5c0 .138.112.25.25.25h7.5a.25.25 0 0 0 .25-.25v-7.5a.25.25 0 0 0-.25-.25Z";
+
+  const LINK_ICON =
+    "M7.775 3.275a.75.75 0 0 0 1.06 1.06l1.25-1.25a2 2 0 1 1 2.83 2.83l-2.5 2.5a2 2 0 0 1-2.83 0 .75.75 0 0 0-1.06 1.06 3.5 3.5 0 0 0 4.95 0l2.5-2.5a3.5 3.5 0 0 0-4.95-4.95l-1.25 1.25zm-4.69 9.64a2 2 0 0 1 0-2.83l2.5-2.5a2 2 0 0 1 2.83 0 .75.75 0 0 0 1.06-1.06 3.5 3.5 0 0 0-4.95 0l-2.5 2.5a3.5 3.5 0 0 0 4.95 4.95l1.25-1.25a.75.75 0 0 0-1.06-1.06l-1.25 1.25a2 2 0 0 1-2.83 0z";
+
   const cache = new Map();
   let lastCard = null;
   let mutating = false;
@@ -81,11 +87,15 @@
     }
   }
 
-  function setCommitIcon(row) {
+  function setItemIcon(row, d) {
     const path = row.querySelector("svg path");
     if (path) {
-      path.setAttribute("d", COMMIT_ICON);
+      path.setAttribute("d", d);
     }
+  }
+
+  function setCommitIcon(row) {
+    setItemIcon(row, COMMIT_ICON);
   }
 
   function findViewFileItem(root) {
@@ -292,6 +302,48 @@
     });
   }
 
+  function copyText(text) {
+    if (!text) {
+      return Promise.resolve();
+    }
+    if (navigator.clipboard?.writeText) {
+      return navigator.clipboard.writeText(text);
+    }
+    return Promise.resolve();
+  }
+
+  function permalinkFor(viewFile, ctx) {
+    const fromLink = helpers.absoluteHref(hrefFromItem(viewFile));
+    if (fromLink && /\/blob\//.test(fromLink)) {
+      return fromLink;
+    }
+    return helpers.blobPermalink(ctx.owner, ctx.repo, ctx.ref, ctx.path);
+  }
+
+  function makeActionItem(template, id, label, icon, onClick) {
+    const row = template.closest("li") || template.parentElement;
+    const cloneRow = row.cloneNode(true);
+    cloneRow.setAttribute(ITEM_ATTR, id);
+    retargetCloneIds(cloneRow);
+    setCloneLabel(cloneRow, label);
+    setItemIcon(cloneRow, icon);
+    stripKeyboardShortcut(cloneRow);
+    const link = itemLink(cloneRow);
+    if (link?.tagName === "A") {
+      link.removeAttribute("href");
+    }
+    cloneRow.addEventListener(
+      "click",
+      (event) => {
+        event.preventDefault();
+        event.stopPropagation();
+        onClick();
+      },
+      true,
+    );
+    return cloneRow;
+  }
+
   function makeLastCommitItem(template, ctx) {
     const row = template.closest("li") || template.parentElement;
     const cloneRow = row.cloneNode(true);
@@ -321,11 +373,6 @@
       return;
     }
 
-    const existing = list.querySelector("[" + ITEM_ATTR + '="last-commit"]');
-    if (existing) {
-      return;
-    }
-
     const ctx = contextFromMenu(viewFile);
     if (!ctx) {
       return;
@@ -333,7 +380,25 @@
 
     mutating = true;
     const row = viewFile.closest("li") || viewFile.parentElement;
-    row.after(makeLastCommitItem(viewFile, ctx));
+    if (!list.querySelector("[" + ITEM_ATTR + '="last-commit"]')) {
+      row.after(makeLastCommitItem(viewFile, ctx));
+    }
+    const lastCommit = list.querySelector("[" + ITEM_ATTR + '="last-commit"]') || row;
+    if (!list.querySelector("[" + ITEM_ATTR + '="copy-path"]')) {
+      lastCommit.after(
+        makeActionItem(viewFile, "copy-path", "Copy path", COPY_ICON, () => {
+          copyText(ctx.path);
+        }),
+      );
+    }
+    const copyPath = list.querySelector("[" + ITEM_ATTR + '="copy-path"]') || lastCommit;
+    if (!list.querySelector("[" + ITEM_ATTR + '="copy-permalink"]')) {
+      copyPath.after(
+        makeActionItem(viewFile, "copy-permalink", "Copy permalink", LINK_ICON, () => {
+          copyText(permalinkFor(viewFile, ctx));
+        }),
+      );
+    }
     mutating = false;
   }
 

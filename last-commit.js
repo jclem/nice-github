@@ -66,6 +66,32 @@
     );
   }
 
+  function blobPermalink(owner, repo, ref, path) {
+    return (
+      "https://github.com/" +
+      owner +
+      "/" +
+      repo +
+      "/blob/" +
+      encodeRef(ref) +
+      "/" +
+      encodePath(path)
+    );
+  }
+
+  function absoluteHref(href) {
+    if (!href) {
+      return null;
+    }
+    try {
+      const url = new URL(href, "https://github.com");
+      url.hash = "";
+      return url.href;
+    } catch {
+      return null;
+    }
+  }
+
   function commitsHistoryUrl(owner, repo, ref, path) {
     return (
       "https://github.com/" +
@@ -214,6 +240,8 @@
     latestCommitUrl,
     commitsHistoryUrl,
     parseBlobHref,
+    blobPermalink,
+    absoluteHref,
     shaFromLatestCommitPayload,
     shaFromCommitsApi,
     shaFromCommitsHtml,

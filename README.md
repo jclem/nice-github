@@ -20,15 +20,17 @@ Other query parameters (for example a selected file anchor) are preserved. An
 explicit `w=0` is respected, making it possible to opt into showing whitespace
 for an individual link.
 
-The Files changed gear menu (Layout) also gets **Hide tests** and **Hide
-generated files**. Tests match `*.test.*` and `_test.*` (so `foo.test.ts` and
-`foo_test.go`). Generated files are ones GitHub already marks as generated.
-Both choices default on and are stored in `chrome.storage.sync` so they apply
-on every repo.
+The Files changed gear menu (Layout) also gets hide toggles for **tests**,
+**generated files**, **deleted files**, and **rename-only files**, plus
+**Custom globs…** for per-repo path patterns (`*.snap`, `vendor/**`). Tests
+match `*.test.*` and `_test.*`. Generated files are ones GitHub already marks
+as generated. Every hide option defaults off and is stored per repository.
 
-When files are hidden, the PR file tree shows a count for each type (tests,
-generated). Clicking the × on a count turns that filter off and shows those
+When files are hidden, the PR file tree shows a count for each type. Clicking
+the × on a count turns that filter off (or removes that glob) and shows those
 files again.
+
+Each file's overflow menu also gets **Copy path** and **Copy permalink**.
 
 Each file's overflow menu (the `...` next to Viewed) also gets **Last commit**,
 which opens the most recent commit that modified that file on the pull request

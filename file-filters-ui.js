@@ -3,17 +3,16 @@
 
   const HIDDEN_CLASS = "nice-github-hidden-file";
   const ITEM_ATTR = "data-nice-github-filter";
+  const SUMMARY_ID = "nice-github-hidden-summary";
   const filters = globalThis.NiceGithubFileFilters;
   if (!filters) {
     return;
   }
 
-  const state = {
-    hideTests: filters.DEFAULTS.hideTests,
-    hideGenerated: filters.DEFAULTS.hideGenerated,
-  };
-
+  const state = filters.normalizeRepoSettings();
   let mutating = false;
+  let lastCounts = "";
+  let lastRepo = null;
 
   function injectStyle() {
     if (document.getElementById("nice-github-file-filter-style")) {
@@ -59,55 +58,115 @@
     (document.head || document.documentElement).appendChild(style);
   }
 
-  function loadSettings(done) {
-    const keys = [filters.STORAGE_KEYS.hideTests, filters.STORAGE_KEYS.hideGenerated];
+  function currentRepo() {
+    return filters.repoFromUrl(location.href);
+  }
 
-    if (!globalThis.chrome?.storage?.sync) {
+  function applyRepoSettings(value) {
+    const next = filters.normalizeRepoSettings(value);
+    state.hideTests = next.hideTests;
+    state.hideGenerated = next.hideGenerated;
+    state.hideDeleted = next.hideDeleted;
+    state.hideRenameOnly = next.hideRenameOnly;
+    state.hideGlobs = next.hideGlobs.slice();
+  }
+
+  function loadSettings(done) {
+    lastRepo = currentRepo();
+    applyRepoSettings();
+    if (!globalThis.chrome?.storage?.sync || !lastRepo) {
       done();
       return;
     }
 
-    chrome.storage.sync.get(keys, (stored) => {
-      const hideTests = stored[filters.STORAGE_KEYS.hideTests];
-      const hideGenerated = stored[filters.STORAGE_KEYS.hideGenerated];
-      if (typeof hideTests === "boolean") {
-        state.hideTests = hideTests;
-      }
-      if (typeof hideGenerated === "boolean") {
-        state.hideGenerated = hideGenerated;
-      }
+    chrome.storage.sync.get([filters.STORAGE_KEYS.repoSettings], (stored) => {
+      const all = stored[filters.STORAGE_KEYS.repoSettings] || {};
+      applyRepoSettings(all[lastRepo]);
       done();
     });
   }
 
   function persist() {
-    if (!globalThis.chrome?.storage?.sync) {
+    const repo = currentRepo();
+    if (!globalThis.chrome?.storage?.sync || !repo) {
       return;
     }
 
-    chrome.storage.sync.set({
-      [filters.STORAGE_KEYS.hideTests]: state.hideTests,
-      [filters.STORAGE_KEYS.hideGenerated]: state.hideGenerated,
+    chrome.storage.sync.get([filters.STORAGE_KEYS.repoSettings], (stored) => {
+      const all = Object.assign({}, stored[filters.STORAGE_KEYS.repoSettings] || {});
+      const snapshot = {
+        hideTests: state.hideTests,
+        hideGenerated: state.hideGenerated,
+        hideDeleted: state.hideDeleted,
+        hideRenameOnly: state.hideRenameOnly,
+        hideGlobs: state.hideGlobs.slice(),
+      };
+      if (filters.isDefaultRepoSettings(snapshot)) {
+        delete all[repo];
+      } else {
+        all[repo] = snapshot;
+      }
+      chrome.storage.sync.set({ [filters.STORAGE_KEYS.repoSettings]: all });
     });
   }
 
   function pathFromTreeItem(item) {
-    return filters.normalizePath(item.id || item.getAttribute("aria-label") || "");
+    return filters.pathFromHeaderText(item.id || item.getAttribute("aria-label") || "");
   }
 
   function pathFromDiffCard(card) {
     const code = card.querySelector('h3[class*="DiffFileHeader-module__file-name"] code');
     if (code) {
-      return filters.normalizePath(code.textContent);
+      return filters.pathFromHeaderText(code.textContent);
     }
 
     const labeled = card.querySelector("table[aria-label^='Diff for:']");
     const aria = labeled?.getAttribute("aria-label") || "";
-    return filters.normalizePath(aria.replace(/^Diff for:\s*/i, ""));
+    return filters.pathFromHeaderText(aria.replace(/^Diff for:\s*/i, ""));
+  }
+
+  function regionText(card) {
+    return (card.textContent || "").replace(/\s+/g, " ");
   }
 
   function isGeneratedCard(card) {
     return Boolean(card.querySelector('[class*="HiddenDiffPatch-module__"]'));
+  }
+
+  function isDeletedCard(card) {
+    if (!card) {
+      return false;
+    }
+    const text = regionText(card);
+    return /this file was deleted/i.test(text) || /\bdeleted file\b/i.test(text);
+  }
+
+  function isDeletedTreeItem(item) {
+    const label = item.getAttribute("aria-label") || "";
+    return /\bdeleted\b/i.test(label);
+  }
+
+  function isRenameOnlyCard(card) {
+    if (!card) {
+      return false;
+    }
+    const text = regionText(card);
+    if (/file renamed without changes/i.test(text)) {
+      return true;
+    }
+    const sr = [...card.querySelectorAll(".sr-only, [class*='sr-only']")]
+      .map((el) => el.textContent || "")
+      .join(" ");
+    if (!/renamed to/i.test(sr) && !card.querySelector("h3 .octicon-arrow-right, h3 svg.octicon-arrow-right")) {
+      return false;
+    }
+    if (isGeneratedCard(card)) {
+      return false;
+    }
+    const hasHunks = card.querySelector(
+      "td.blob-code-addition, td.blob-code-deletion, [class*='DiffHunk']",
+    );
+    return !hasHunks;
   }
 
   function isTreeLeaf(item) {
@@ -141,7 +200,42 @@
     }
   }
 
+  function shouldHide(path, card, treeItem) {
+    if (state.hideTests && path && filters.isTestPath(path)) {
+      return true;
+    }
+    if (state.hideGenerated && card && isGeneratedCard(card)) {
+      return true;
+    }
+    if (state.hideDeleted && (isDeletedCard(card) || (treeItem && isDeletedTreeItem(treeItem)))) {
+      return true;
+    }
+    if (state.hideRenameOnly && isRenameOnlyCard(card)) {
+      return true;
+    }
+    if (path && filters.pathMatchesAnyGlob(path, state.hideGlobs)) {
+      return true;
+    }
+    return false;
+  }
+
+  function anyFilterOn() {
+    return (
+      state.hideTests ||
+      state.hideGenerated ||
+      state.hideDeleted ||
+      state.hideRenameOnly ||
+      state.hideGlobs.length > 0
+    );
+  }
+
   function applyFilters(root) {
+    const repo = currentRepo();
+    if (repo !== lastRepo) {
+      loadSettings(() => applyFilters(document));
+      return;
+    }
+
     const scope = root || document;
     const previously = scope.querySelectorAll?.("." + HIDDEN_CLASS);
     if (previously) {
@@ -150,7 +244,7 @@
       }
     }
 
-    if (!state.hideTests && !state.hideGenerated) {
+    if (!anyFilterOn()) {
       renderHiddenSummary();
       return;
     }
@@ -158,9 +252,7 @@
     const cards = scope.querySelectorAll?.('div[role="region"][id^="diff-"]') || [];
     for (const card of cards) {
       const path = pathFromDiffCard(card);
-      const hideTest = state.hideTests && path && filters.isTestPath(path);
-      const hideGenerated = state.hideGenerated && isGeneratedCard(card);
-      if (hideTest || hideGenerated) {
+      if (shouldHide(path, card, treeItemForPath(path))) {
         hidePair(treeItemForPath(path), card);
       }
     }
@@ -172,9 +264,7 @@
       }
       const path = pathFromTreeItem(item);
       const card = diffCardForTreeItem(item);
-      const hideTest = state.hideTests && path && filters.isTestPath(path);
-      const hideGenerated = state.hideGenerated && card && isGeneratedCard(card);
-      if (hideTest || hideGenerated) {
+      if (shouldHide(path, card, item)) {
         hidePair(item, card);
       }
     }
@@ -182,22 +272,40 @@
     renderHiddenSummary();
   }
 
-  const SUMMARY_ID = "nice-github-hidden-summary";
-  let lastCounts = { tests: -1, generated: -1 };
-
   function countHidden() {
     const tests = new Set();
     const generated = new Set();
+    const deleted = new Set();
+    const renamed = new Set();
+    const globs = {};
+
+    function note(path, card, treeItem, fallbackId) {
+      const id = path || fallbackId;
+      if (!id) {
+        return;
+      }
+      if (path && filters.isTestPath(path)) {
+        tests.add(id);
+      }
+      if (card && isGeneratedCard(card)) {
+        generated.add(id);
+      }
+      if (isDeletedCard(card) || (treeItem && isDeletedTreeItem(treeItem))) {
+        deleted.add(id);
+      }
+      if (isRenameOnlyCard(card)) {
+        renamed.add(id);
+      }
+      for (const glob of filters.matchingGlobs(path, state.hideGlobs)) {
+        globs[glob] = globs[glob] || new Set();
+        globs[glob].add(id);
+      }
+    }
 
     const cards = document.querySelectorAll('div[role="region"][id^="diff-"].' + HIDDEN_CLASS);
     for (const card of cards) {
       const path = pathFromDiffCard(card);
-      if (path && filters.isTestPath(path)) {
-        tests.add(path);
-      }
-      if (isGeneratedCard(card)) {
-        generated.add(path || card.id);
-      }
+      note(path, card, treeItemForPath(path), card.id);
     }
 
     const leaves = document.querySelectorAll("#pr-file-tree li[role='treeitem']." + HIDDEN_CLASS);
@@ -206,16 +314,21 @@
         continue;
       }
       const path = pathFromTreeItem(item);
-      if (path && filters.isTestPath(path)) {
-        tests.add(path);
-      }
-      const card = diffCardForTreeItem(item);
-      if (card && isGeneratedCard(card)) {
-        generated.add(path || item.id);
-      }
+      note(path, diffCardForTreeItem(item), item, item.id);
     }
 
-    return { tests: tests.size, generated: generated.size };
+    const globCounts = {};
+    for (const [glob, ids] of Object.entries(globs)) {
+      globCounts[glob] = ids.size;
+    }
+
+    return {
+      tests: tests.size,
+      generated: generated.size,
+      deleted: deleted.size,
+      renamed: renamed.size,
+      globs: globCounts,
+    };
   }
 
   function syncMenuChecks() {
@@ -224,8 +337,12 @@
     if (!list) {
       return;
     }
-    setItemChecked(checkedControl(list, "hideTests"), state.hideTests);
-    setItemChecked(checkedControl(list, "hideGenerated"), state.hideGenerated);
+    for (const key of ["hideTests", "hideGenerated", "hideDeleted", "hideRenameOnly"]) {
+      const control = checkedControl(list, key);
+      if (control) {
+        setItemChecked(control, state[key]);
+      }
+    }
   }
 
   function setHide(key, value) {
@@ -235,23 +352,43 @@
     syncMenuChecks();
   }
 
-  function makeChip(hideKey, kind, count) {
+  function removeGlob(glob) {
+    state.hideGlobs = state.hideGlobs.filter((item) => item !== glob);
+    persist();
+    applyFilters(document);
+  }
+
+  function editGlobs() {
+    const repo = currentRepo() || "this repo";
+    const next = window.prompt(
+      "Hide files matching these globs for " + repo + " (one per line):",
+      state.hideGlobs.join("\n"),
+    );
+    if (next === null) {
+      return;
+    }
+    state.hideGlobs = filters.parseGlobs(next);
+    persist();
+    applyFilters(document);
+  }
+
+  function makeChip(kind, count, options) {
     const chip = document.createElement("span");
     chip.className = "nice-github-hidden-chip";
-    chip.setAttribute("data-nice-github-chip", kind);
+    chip.setAttribute("data-nice-github-chip", options?.glob || kind);
 
     const label = document.createElement("span");
-    label.textContent = filters.hiddenCountLabel(kind, count);
+    label.textContent = filters.hiddenCountLabel(kind, count, options?.glob);
     chip.appendChild(label);
 
     const button = document.createElement("button");
     button.type = "button";
-    button.setAttribute("aria-label", kind === "tests" ? "Show tests" : "Show generated files");
+    button.setAttribute("aria-label", options?.ariaLabel || "Show files");
     button.textContent = "×";
     button.addEventListener("click", (event) => {
       event.preventDefault();
       event.stopPropagation();
-      setHide(hideKey, false);
+      options?.onClear?.();
     });
     chip.appendChild(button);
     return chip;
@@ -275,14 +412,22 @@
     }
 
     const counts = countHidden();
+    const signature = JSON.stringify(counts);
+    const empty =
+      !counts.tests &&
+      !counts.generated &&
+      !counts.deleted &&
+      !counts.renamed &&
+      Object.keys(counts.globs).length === 0;
+
     let bar = document.getElementById(SUMMARY_ID);
-    if (!counts.tests && !counts.generated) {
+    if (empty) {
       if (bar) {
         mutating = true;
         bar.remove();
         mutating = false;
       }
-      lastCounts = counts;
+      lastCounts = signature;
       return;
     }
 
@@ -296,22 +441,53 @@
       mutating = false;
     }
 
-    if (
-      counts.tests === lastCounts.tests &&
-      counts.generated === lastCounts.generated &&
-      bar.childElementCount > 0
-    ) {
+    if (signature === lastCounts && bar.childElementCount > 0) {
       return;
     }
 
-    lastCounts = counts;
+    lastCounts = signature;
     mutating = true;
     bar.replaceChildren();
     if (counts.tests) {
-      bar.appendChild(makeChip("hideTests", "tests", counts.tests));
+      bar.appendChild(
+        makeChip("tests", counts.tests, {
+          ariaLabel: "Show tests",
+          onClear: () => setHide("hideTests", false),
+        }),
+      );
     }
     if (counts.generated) {
-      bar.appendChild(makeChip("hideGenerated", "generated", counts.generated));
+      bar.appendChild(
+        makeChip("generated", counts.generated, {
+          ariaLabel: "Show generated files",
+          onClear: () => setHide("hideGenerated", false),
+        }),
+      );
+    }
+    if (counts.deleted) {
+      bar.appendChild(
+        makeChip("deleted", counts.deleted, {
+          ariaLabel: "Show deleted files",
+          onClear: () => setHide("hideDeleted", false),
+        }),
+      );
+    }
+    if (counts.renamed) {
+      bar.appendChild(
+        makeChip("renamed", counts.renamed, {
+          ariaLabel: "Show rename-only files",
+          onClear: () => setHide("hideRenameOnly", false),
+        }),
+      );
+    }
+    for (const [glob, count] of Object.entries(counts.globs)) {
+      bar.appendChild(
+        makeChip("glob", count, {
+          glob,
+          ariaLabel: "Stop hiding " + glob,
+          onClear: () => removeGlob(glob),
+        }),
+      );
     }
     mutating = false;
   }
@@ -367,9 +543,16 @@
   }
 
   function setCloneLabel(item, label) {
+    const primer = item.querySelector('[data-component="ActionList.Item.Label"]');
+    if (primer) {
+      primer.textContent = label;
+      return;
+    }
+
     const labelled = item.getAttribute("aria-labelledby") || "";
     const labelId = labelled.split(/\s+/)[0];
-    const labelNode = (labelId && item.querySelector("#" + CSS.escape(labelId))) ||
+    const labelNode =
+      (labelId && item.querySelector("#" + CSS.escape(labelId))) ||
       item.querySelector("[id$='--label']");
     if (labelNode) {
       labelNode.textContent = label;
@@ -407,6 +590,32 @@
     return cloneRow;
   }
 
+  function makeGlobsItem(template) {
+    const row = template.closest("li") || template.parentElement;
+    const cloneRow = row.cloneNode(true);
+    cloneRow.setAttribute(ITEM_ATTR, "customGlobs");
+    retargetCloneIds(cloneRow);
+    setCloneLabel(cloneRow, "Custom globs…");
+
+    const control =
+      cloneRow.querySelector("[role='menuitemcheckbox']") || cloneRow;
+    control.setAttribute(ITEM_ATTR, "customGlobs");
+    control.setAttribute("role", "menuitem");
+    control.removeAttribute("aria-checked");
+    const check = cloneRow.querySelector('[data-component="ActionList.Selection"]');
+    if (check) {
+      check.style.visibility = "hidden";
+    }
+
+    cloneRow.addEventListener("click", (event) => {
+      event.preventDefault();
+      event.stopPropagation();
+      editGlobs();
+    });
+
+    return cloneRow;
+  }
+
   function checkedControl(list, id) {
     return list.querySelector(
       "[" + ITEM_ATTR + '="' + id + '"] [role="menuitemcheckbox"], [' + ITEM_ATTR + '="' + id + '"]',
@@ -426,21 +635,14 @@
     }
 
     if (list.querySelector("[" + ITEM_ATTR + '="hideTests"]')) {
-      setItemChecked(checkedControl(list, "hideTests"), state.hideTests);
-      setItemChecked(checkedControl(list, "hideGenerated"), state.hideGenerated);
+      syncMenuChecks();
       return;
     }
 
     mutating = true;
-    const testsItem = makeFilterItem(
-      whitespace,
-      "hideTests",
-      "Hide tests",
-      state.hideTests,
-      () => {
-        setHide("hideTests", !state.hideTests);
-      },
-    );
+    const testsItem = makeFilterItem(whitespace, "hideTests", "Hide tests", state.hideTests, () => {
+      setHide("hideTests", !state.hideTests);
+    });
     const generatedItem = makeFilterItem(
       whitespace,
       "hideGenerated",
@@ -450,7 +652,29 @@
         setHide("hideGenerated", !state.hideGenerated);
       },
     );
+    const deletedItem = makeFilterItem(
+      whitespace,
+      "hideDeleted",
+      "Hide deleted files",
+      state.hideDeleted,
+      () => {
+        setHide("hideDeleted", !state.hideDeleted);
+      },
+    );
+    const renamedItem = makeFilterItem(
+      whitespace,
+      "hideRenameOnly",
+      "Hide rename-only files",
+      state.hideRenameOnly,
+      () => {
+        setHide("hideRenameOnly", !state.hideRenameOnly);
+      },
+    );
+    const globsItem = makeGlobsItem(whitespace);
 
+    row.after(globsItem);
+    row.after(renamedItem);
+    row.after(deletedItem);
     row.after(generatedItem);
     row.after(testsItem);
     mutating = false;
@@ -476,15 +700,17 @@
         if (area !== "sync") {
           return;
         }
-        const tests = changes[filters.STORAGE_KEYS.hideTests];
-        const generated = changes[filters.STORAGE_KEYS.hideGenerated];
-        if (tests && typeof tests.newValue === "boolean") {
-          state.hideTests = tests.newValue;
+        const update = changes[filters.STORAGE_KEYS.repoSettings];
+        if (!update) {
+          return;
         }
-        if (generated && typeof generated.newValue === "boolean") {
-          state.hideGenerated = generated.newValue;
+        const repo = currentRepo();
+        if (!repo) {
+          return;
         }
+        applyRepoSettings((update.newValue || {})[repo]);
         applyFilters(document);
+        syncMenuChecks();
       });
     }
   }

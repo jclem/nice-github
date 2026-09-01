@@ -94,3 +94,15 @@ test("headFromPayload also accepts headSha", () => {
     { sha: "7bf0bd988149071d1b42f0f6f384369ae0ba360d", ref: null },
   );
 });
+
+test("blobPermalink builds a commitish blob URL", () => {
+  assert.equal(
+    lastCommit.blobPermalink(
+      "cli",
+      "cli",
+      "7bf0bd988149071d1b42f0f6f384369ae0ba360d",
+      "pkg/cmd/repo/create/create.go",
+    ),
+    "https://github.com/cli/cli/blob/7bf0bd988149071d1b42f0f6f384369ae0ba360d/pkg/cmd/repo/create/create.go",
+  );
+});
