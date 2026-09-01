@@ -1,7 +1,7 @@
 {
   "manifest_version": 3,
   "name": "Nice GitHub",
-  "version": "0.7.0",
+  "version": "0.7.1",
   "description": "Makes GitHub pull request diffs easier to review.",
   "host_permissions": [
     "https://github.com/*"

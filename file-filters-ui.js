@@ -54,6 +54,35 @@
       "font-size:14px;",
       "line-height:1;",
       "}",
+      ".nice-github-glob-row{",
+      "display:flex;",
+      "align-items:center;",
+      "gap:6px;",
+      "width:100%;",
+      "}",
+      ".nice-github-glob-input{",
+      "flex:1;",
+      "min-width:8em;",
+      "margin:0;",
+      "border:1px solid var(--borderColor-muted,#d1d9e0);",
+      "border-radius:6px;",
+      "padding:2px 6px;",
+      "font:inherit;",
+      "font-size:12px;",
+      "background:var(--bgColor-default,#fff);",
+      "color:inherit;",
+      "}",
+      ".nice-github-glob-remove{",
+      "border:0;",
+      "background:transparent;",
+      "color:var(--fgColor-muted,#59636e);",
+      "cursor:pointer;",
+      "padding:4px 8px;",
+      "min-width:24px;",
+      "min-height:24px;",
+      "font-size:14px;",
+      "line-height:1;",
+      "}",
     ].join("");
     (document.head || document.documentElement).appendChild(style);
   }
@@ -99,7 +128,7 @@
         hideGenerated: state.hideGenerated,
         hideDeleted: state.hideDeleted,
         hideRenameOnly: state.hideRenameOnly,
-        hideGlobs: state.hideGlobs.slice(),
+        hideGlobs: state.hideGlobs.map((glob) => filters.normalizePath(glob)).filter(Boolean),
       };
       if (filters.isDefaultRepoSettings(snapshot)) {
         delete all[repo];
@@ -352,24 +381,53 @@
     syncMenuChecks();
   }
 
+  function uniqueGlobs(list) {
+    const seen = new Set();
+    const out = [];
+    for (const item of list) {
+      const glob = filters.normalizePath(item);
+      if (!glob || seen.has(glob)) {
+        continue;
+      }
+      seen.add(glob);
+      out.push(glob);
+    }
+    return out;
+  }
+
   function removeGlob(glob) {
     state.hideGlobs = state.hideGlobs.filter((item) => item !== glob);
     persist();
     applyFilters(document);
+    refreshGlobRows();
   }
 
-  function editGlobs() {
-    const repo = currentRepo() || "this repo";
-    const next = window.prompt(
-      "Hide files matching these globs for " + repo + " (one per line):",
-      state.hideGlobs.join("\n"),
-    );
-    if (next === null) {
-      return;
+  function commitGlobAt(index, value) {
+    const next = state.hideGlobs.slice();
+    const glob = filters.normalizePath(value);
+    if (!glob) {
+      next.splice(index, 1);
+    } else {
+      next[index] = glob;
     }
-    state.hideGlobs = filters.parseGlobs(next);
+    state.hideGlobs = uniqueGlobs(next);
     persist();
     applyFilters(document);
+    refreshGlobRows();
+  }
+
+  function addGlobRow() {
+    state.hideGlobs = state.hideGlobs.concat([""]);
+    refreshGlobRows();
+    requestAnimationFrame(() => {
+      const inputs = document.querySelectorAll(".nice-github-glob-input");
+      const last = inputs[inputs.length - 1];
+      last?.focus();
+    });
+  }
+
+  function stopMenuClose(event) {
+    event.stopPropagation();
   }
 
   function makeChip(kind, count, options) {
@@ -590,30 +648,135 @@
     return cloneRow;
   }
 
-  function makeGlobsItem(template) {
-    const row = template.closest("li") || template.parentElement;
-    const cloneRow = row.cloneNode(true);
-    cloneRow.setAttribute(ITEM_ATTR, "customGlobs");
-    retargetCloneIds(cloneRow);
-    setCloneLabel(cloneRow, "Custom globs…");
-
-    const control =
-      cloneRow.querySelector("[role='menuitemcheckbox']") || cloneRow;
-    control.setAttribute(ITEM_ATTR, "customGlobs");
+  function hideActionListCheck(row) {
+    const control = row.querySelector("[role='menuitemcheckbox']") || row;
     control.setAttribute("role", "menuitem");
     control.removeAttribute("aria-checked");
-    const check = cloneRow.querySelector('[data-component="ActionList.Selection"]');
+    const check = row.querySelector('[data-component="ActionList.Selection"]');
     if (check) {
       check.style.visibility = "hidden";
+      check.style.display = "none";
+    }
+  }
+
+  function makeGlobRow(template, glob, index) {
+    const row = template.closest("li") || template.parentElement;
+    const cloneRow = row.cloneNode(true);
+    cloneRow.setAttribute(ITEM_ATTR, "glob-row");
+    cloneRow.setAttribute("data-nice-github-glob-index", String(index));
+    retargetCloneIds(cloneRow);
+    hideActionListCheck(cloneRow);
+
+    const input = document.createElement("input");
+    input.type = "text";
+    input.value = glob;
+    input.className = "nice-github-glob-input";
+    input.setAttribute("aria-label", "Hide glob");
+    input.placeholder = "*.snap";
+    input.addEventListener("mousedown", stopMenuClose);
+    input.addEventListener("click", stopMenuClose);
+    input.addEventListener("keydown", (event) => {
+      event.stopPropagation();
+      if (event.key === "Enter") {
+        event.preventDefault();
+        input.blur();
+      }
+    });
+    input.addEventListener("blur", () => {
+      commitGlobAt(index, input.value);
+    });
+
+    const remove = document.createElement("button");
+    remove.type = "button";
+    remove.className = "nice-github-glob-remove";
+    remove.setAttribute("aria-label", "Remove glob " + glob);
+    remove.textContent = "×";
+    remove.addEventListener("mousedown", (event) => {
+      event.preventDefault();
+      stopMenuClose(event);
+    });
+    remove.addEventListener("click", (event) => {
+      event.preventDefault();
+      event.stopPropagation();
+      commitGlobAt(index, "");
+    });
+
+    const wrap = document.createElement("span");
+    wrap.className = "nice-github-glob-row";
+    wrap.appendChild(input);
+    wrap.appendChild(remove);
+
+    const label = cloneRow.querySelector('[data-component="ActionList.Item.Label"]');
+    if (label) {
+      label.replaceChildren(wrap);
+    } else {
+      cloneRow.appendChild(wrap);
     }
 
+    cloneRow.addEventListener("click", stopMenuClose);
+    return cloneRow;
+  }
+
+  function makeAddGlobItem(template) {
+    const row = template.closest("li") || template.parentElement;
+    const cloneRow = row.cloneNode(true);
+    cloneRow.setAttribute(ITEM_ATTR, "addGlob");
+    retargetCloneIds(cloneRow);
+    setCloneLabel(cloneRow, "Add glob");
+    hideActionListCheck(cloneRow);
     cloneRow.addEventListener("click", (event) => {
       event.preventDefault();
       event.stopPropagation();
-      editGlobs();
+      addGlobRow();
     });
-
     return cloneRow;
+  }
+
+  function refreshGlobRows() {
+    const whitespace = findHideWhitespaceItem(document);
+    if (!whitespace) {
+      return;
+    }
+    const list = (whitespace.closest("li") || whitespace.parentElement)?.parentElement;
+    if (!list) {
+      return;
+    }
+    syncGlobRows(list, whitespace);
+  }
+
+  function syncGlobRows(list, template) {
+    if (list.querySelector(".nice-github-glob-input:focus")) {
+      return;
+    }
+
+    const shown = [...list.querySelectorAll("[" + ITEM_ATTR + '="glob-row"] input')].map(
+      (input) => input.value,
+    );
+    const addExists = Boolean(list.querySelector("[" + ITEM_ATTR + '="addGlob"]'));
+    if (addExists && JSON.stringify(shown) === JSON.stringify(state.hideGlobs)) {
+      return;
+    }
+
+    mutating = true;
+    for (const row of list.querySelectorAll(
+      "[" + ITEM_ATTR + '="glob-row"], [' + ITEM_ATTR + '="addGlob"], [' + ITEM_ATTR + '="customGlobs"]',
+    )) {
+      row.remove();
+    }
+
+    const after = list.querySelector("[" + ITEM_ATTR + '="hideRenameOnly"]');
+    let insertAfter = after;
+    if (!insertAfter) {
+      mutating = false;
+      return;
+    }
+    state.hideGlobs.forEach((glob, index) => {
+      const row = makeGlobRow(template, glob, index);
+      insertAfter.after(row);
+      insertAfter = row;
+    });
+    insertAfter.after(makeAddGlobItem(template));
+    mutating = false;
   }
 
   function checkedControl(list, id) {
@@ -636,6 +799,7 @@
 
     if (list.querySelector("[" + ITEM_ATTR + '="hideTests"]')) {
       syncMenuChecks();
+      syncGlobRows(list, whitespace);
       return;
     }
 
@@ -670,14 +834,13 @@
         setHide("hideRenameOnly", !state.hideRenameOnly);
       },
     );
-    const globsItem = makeGlobsItem(whitespace);
 
-    row.after(globsItem);
     row.after(renamedItem);
     row.after(deletedItem);
     row.after(generatedItem);
     row.after(testsItem);
     mutating = false;
+    syncGlobRows(list, whitespace);
   }
 
   function boot() {
@@ -711,6 +874,7 @@
         applyRepoSettings((update.newValue || {})[repo]);
         applyFilters(document);
         syncMenuChecks();
+        refreshGlobRows();
       });
     }
   }

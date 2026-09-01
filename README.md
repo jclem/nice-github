@@ -21,8 +21,9 @@ explicit `w=0` is respected, making it possible to opt into showing whitespace
 for an individual link.
 
 The Files changed gear menu (Layout) also gets hide toggles for **tests**,
-**generated files**, **deleted files**, and **rename-only files**, plus
-**Custom globs…** for per-repo path patterns (`*.snap`, `vendor/**`). Tests
+**generated files**, **deleted files**, and **rename-only files**. **Add glob**
+adds an editable path pattern for this repo. Each glob is its own line with
+an × to remove it. Tests
 match `*.test.*` and `_test.*`. Generated files are ones GitHub already marks
 as generated. Every hide option defaults off and is stored per repository.
 
