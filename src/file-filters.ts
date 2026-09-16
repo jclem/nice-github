@@ -122,6 +122,10 @@ export function matchingGlobs(path: unknown, globs: string[] | null | undefined)
   return (globs || []).filter((glob) => pathMatchesGlob(path, glob));
 }
 
+export function allTreeLeavesHidden(hiddenStates: readonly boolean[]): boolean {
+  return hiddenStates.length > 0 && hiddenStates.every(Boolean);
+}
+
 export function hiddenCountLabel(kind: string, count: unknown, glob?: string): string {
   const n = Number(count) || 0;
   if (kind === "tests") {
@@ -164,4 +168,3 @@ export function isDefaultRepoSettings(settings?: Partial<RepoSettings> | null): 
     normalized.hideGlobs.length === 0
   );
 }
-

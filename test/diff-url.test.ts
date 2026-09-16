@@ -32,3 +32,9 @@ test("does not alter other GitHub routes or hosts", () => {
   assert.equal(withWhitespaceHidden("https://github.com/acme/widget/pull/42"), null);
   assert.equal(withWhitespaceHidden("https://gist.github.com/acme/widget/pull/42/files"), null);
 });
+
+test("ignores malformed link targets", () => {
+  assert.equal(isPullRequestFilesUrl(""), false);
+  assert.equal(withWhitespaceHidden(""), null);
+  assert.equal(withWhitespaceHidden("not a URL"), null);
+});

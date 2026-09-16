@@ -2,6 +2,7 @@ import { bootChromeHide } from "./chrome-hide";
 import { withWhitespaceHidden } from "./diff-url";
 import { bootFileFilters } from "./file-filters-ui";
 import { bootFileMenu } from "./last-commit-ui";
+import { bootViewedFiles } from "./viewed-files-ui";
 
 function rewriteLink(link: HTMLAnchorElement): void {
   const redirectedUrl = withWhitespaceHidden(link.href);
@@ -77,3 +78,4 @@ bootChromeHide();
 bootContent();
 bootFileFilters();
 bootFileMenu();
+bootViewedFiles();

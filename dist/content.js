@@ -38,13 +38,20 @@ var NiceGithubContent = (function(exports) {
     (document.head || document.documentElement).appendChild(style);
   }
   const PR_FILES_PATH = /^\/[^/]+\/[^/]+\/pull\/\d+\/(?:changes|files)\/?$/;
+  function parseUrl(value) {
+    try {
+      return new URL(value instanceof URL ? value.href : value);
+    } catch {
+      return null;
+    }
+  }
   function isPullRequestFilesUrl(value) {
-    const url = value instanceof URL ? value : new URL(value);
-    return url.hostname === "github.com" && PR_FILES_PATH.test(url.pathname);
+    const url = parseUrl(value);
+    return url !== null && url.hostname === "github.com" && PR_FILES_PATH.test(url.pathname);
   }
   function withWhitespaceHidden(value) {
-    const url = value instanceof URL ? new URL(value.href) : new URL(value);
-    if (!isPullRequestFilesUrl(url) || url.searchParams.has("w")) {
+    const url = parseUrl(value);
+    if (url === null || !isPullRequestFilesUrl(url) || url.searchParams.has("w")) {
       return null;
     }
     url.searchParams.set("w", "1");
@@ -120,6 +127,9 @@ var NiceGithubContent = (function(exports) {
   function matchingGlobs(path, globs) {
     return (globs || []).filter((glob) => pathMatchesGlob(path, glob));
   }
+  function allTreeLeavesHidden(hiddenStates) {
+    return hiddenStates.length > 0 && hiddenStates.every(Boolean);
+  }
   function hiddenCountLabel(kind, count, glob) {
     const n = Number(count) || 0;
     if (kind === "tests") {
@@ -158,10 +168,10 @@ var NiceGithubContent = (function(exports) {
   const ITEM_ATTR$1 = "data-nice-github-filter";
   const SUMMARY_ID = "nice-github-hidden-summary";
   const state = normalizeRepoSettings();
-  let mutating$1 = false;
+  let mutating$2 = false;
   let lastCounts = "";
   let lastRepo = null;
-  function injectStyle() {
+  function injectStyle$1() {
     if (document.getElementById("nice-github-file-filter-style")) {
       return;
     }
@@ -344,7 +354,7 @@ var NiceGithubContent = (function(exports) {
       return null;
     }
     const item = document.getElementById(path);
-    return isTreeLeaf(item) ? item : null;
+    return item && isTreeLeaf(item) ? item : null;
   }
   function hidePair(treeItem, card) {
     if (treeItem) {
@@ -374,6 +384,18 @@ var NiceGithubContent = (function(exports) {
   }
   function anyFilterOn() {
     return state.hideTests || state.hideGenerated || state.hideDeleted || state.hideRenameOnly || state.hideGlobs.length > 0;
+  }
+  function hideEmptyTreeDirectories(scope) {
+    const items = scope.querySelectorAll('#pr-file-tree li[role="treeitem"]');
+    for (const item of items) {
+      if (isTreeLeaf(item)) {
+        continue;
+      }
+      const leaves = [...item.querySelectorAll('li[role="treeitem"]')].filter(isTreeLeaf);
+      if (allTreeLeavesHidden(leaves.map((leaf) => leaf.classList.contains(HIDDEN_CLASS)))) {
+        item.classList.add(HIDDEN_CLASS);
+      }
+    }
   }
   function applyFilters(root) {
     const repo = currentRepo();
@@ -408,6 +430,7 @@ var NiceGithubContent = (function(exports) {
         hidePair(item, card);
       }
     }
+    hideEmptyTreeDirectories(scope);
     renderHiddenSummary();
   }
   function countHidden() {
@@ -563,9 +586,9 @@ var NiceGithubContent = (function(exports) {
     let bar = document.getElementById(SUMMARY_ID);
     if (empty) {
       if (bar) {
-        mutating$1 = true;
+        mutating$2 = true;
         bar.remove();
-        mutating$1 = false;
+        mutating$2 = false;
       }
       lastCounts = signature;
       return;
@@ -575,15 +598,15 @@ var NiceGithubContent = (function(exports) {
       bar.id = SUMMARY_ID;
     }
     if (bar.nextElementSibling !== anchor) {
-      mutating$1 = true;
+      mutating$2 = true;
       anchor.parentElement.insertBefore(bar, anchor);
-      mutating$1 = false;
+      mutating$2 = false;
     }
     if (signature === lastCounts && bar.childElementCount > 0) {
       return;
     }
     lastCounts = signature;
-    mutating$1 = true;
+    mutating$2 = true;
     bar.replaceChildren();
     if (counts.tests) {
       bar.appendChild(
@@ -626,7 +649,7 @@ var NiceGithubContent = (function(exports) {
         })
       );
     }
-    mutating$1 = false;
+    mutating$2 = false;
   }
   function itemLabel$1(node) {
     return (node.textContent || "").replace(/\s+/g, " ").trim();
@@ -803,7 +826,7 @@ var NiceGithubContent = (function(exports) {
     if (addExists && JSON.stringify(shown) === JSON.stringify(state.hideGlobs)) {
       return;
     }
-    mutating$1 = true;
+    mutating$2 = true;
     for (const row of list.querySelectorAll(
       "[" + ITEM_ATTR$1 + '="glob-row"], [' + ITEM_ATTR$1 + '="addGlob"], [' + ITEM_ATTR$1 + '="customGlobs"]'
     )) {
@@ -811,7 +834,7 @@ var NiceGithubContent = (function(exports) {
     }
     const after = list.querySelector("[" + ITEM_ATTR$1 + '="hideRenameOnly"]');
     if (!after) {
-      mutating$1 = false;
+      mutating$2 = false;
       return;
     }
     let insertAfter = after;
@@ -821,7 +844,7 @@ var NiceGithubContent = (function(exports) {
       insertAfter = row;
     });
     insertAfter.after(makeAddGlobItem(template));
-    mutating$1 = false;
+    mutating$2 = false;
   }
   function checkedControl(list, id) {
     return list.querySelector(
@@ -843,7 +866,7 @@ var NiceGithubContent = (function(exports) {
       syncGlobRows(list, whitespace);
       return;
     }
-    mutating$1 = true;
+    mutating$2 = true;
     const testsItem = makeFilterItem(whitespace, "hideTests", "Hide tests", state.hideTests, () => {
       setHide("hideTests", !state.hideTests);
     });
@@ -878,17 +901,17 @@ var NiceGithubContent = (function(exports) {
     row.after(deletedItem);
     row.after(generatedItem);
     row.after(testsItem);
-    mutating$1 = false;
+    mutating$2 = false;
     syncGlobRows(list, whitespace);
   }
   function bootFileFilters() {
-    injectStyle();
+    injectStyle$1();
     loadSettings(() => {
       applyFilters(document);
       injectMenuItems$1();
     });
     new MutationObserver(() => {
-      if (mutating$1) {
+      if (mutating$2) {
         return;
       }
       injectMenuItems$1();
@@ -1063,7 +1086,7 @@ var NiceGithubContent = (function(exports) {
   const LINK_ICON = "M7.775 3.275a.75.75 0 0 0 1.06 1.06l1.25-1.25a2 2 0 1 1 2.83 2.83l-2.5 2.5a2 2 0 0 1-2.83 0 .75.75 0 0 0-1.06 1.06 3.5 3.5 0 0 0 4.95 0l2.5-2.5a3.5 3.5 0 0 0-4.95-4.95l-1.25 1.25zm-4.69 9.64a2 2 0 0 1 0-2.83l2.5-2.5a2 2 0 0 1 2.83 0 .75.75 0 0 0 1.06-1.06 3.5 3.5 0 0 0-4.95 0l-2.5 2.5a3.5 3.5 0 0 0 4.95 4.95l1.25-1.25a.75.75 0 0 0-1.06-1.06l-1.25 1.25a2 2 0 0 1-2.83 0z";
   const cache = /* @__PURE__ */ new Map();
   let lastCard = null;
-  let mutating = false;
+  let mutating$1 = false;
   function itemLabel(node) {
     return (node.textContent || "").replace(/\s+/g, " ").trim();
   }
@@ -1364,7 +1387,7 @@ var NiceGithubContent = (function(exports) {
     if (!ctx) {
       return;
     }
-    mutating = true;
+    mutating$1 = true;
     const row = viewFile.closest("li") || viewFile.parentElement;
     if (!list.querySelector("[" + ITEM_ATTR + '="last-commit"]')) {
       row.after(makeLastCommitItem(viewFile, ctx));
@@ -1385,7 +1408,7 @@ var NiceGithubContent = (function(exports) {
         })
       );
     }
-    mutating = false;
+    mutating$1 = false;
   }
   function bootFileMenu() {
     document.addEventListener(
@@ -1400,11 +1423,219 @@ var NiceGithubContent = (function(exports) {
     );
     injectMenuItems();
     new MutationObserver(() => {
-      if (mutating) {
+      if (mutating$1) {
         return;
       }
       injectMenuItems();
     }).observe(document.documentElement || document, {
+      childList: true,
+      subtree: true
+    });
+  }
+  function normalizedLabel(element) {
+    const direct = (element.getAttribute("aria-label") || element.getAttribute("title") || element.textContent || "").replace(/\s+/g, " ").trim();
+    if (direct) {
+      return direct;
+    }
+    const labelledBy = element.getAttribute("aria-labelledby") || "";
+    return labelledBy.split(/\s+/).map((id) => document.getElementById(id)?.textContent || "").join(" ").replace(/\s+/g, " ").trim();
+  }
+  function isViewedLabel(element) {
+    return /\bviewed\b/i.test(normalizedLabel(element));
+  }
+  function parseViewedCount(value) {
+    const match = (value || "").replace(/\s+/g, " ").trim().match(/^(\d+)\s*(?:\/|of)\s*(\d+)\s+(?:files?\s+)?viewed$/i);
+    return match ? { viewed: Number(match[1]), total: Number(match[2]) } : null;
+  }
+  function viewedState(control) {
+    if ("checked" in control && typeof control.checked === "boolean") {
+      return Boolean(control.checked);
+    }
+    for (const attribute of ["aria-checked", "aria-pressed"]) {
+      const value = control.getAttribute(attribute);
+      if (value === "true") {
+        return true;
+      }
+      if (value === "false") {
+        return false;
+      }
+    }
+    const dataState = control.getAttribute("data-state");
+    if (dataState === "checked" || dataState === "on") {
+      return true;
+    }
+    if (dataState === "unchecked" || dataState === "off") {
+      return false;
+    }
+    const input = control.querySelector?.('input[type="checkbox"]');
+    if (input) {
+      return input.checked;
+    }
+    const nested = control.querySelector?.(
+      '[aria-checked], [aria-pressed], [data-state="checked"], [data-state="unchecked"], [data-state="on"], [data-state="off"]'
+    );
+    return nested ? viewedState(nested) : null;
+  }
+  function findViewedControls(root = document) {
+    const candidates = root.querySelectorAll(
+      [
+        "button",
+        "[aria-pressed]",
+        "[aria-checked]",
+        '[role="checkbox"][aria-label*="viewed" i]',
+        'input[type="checkbox"][aria-label*="viewed" i]',
+        'input[type="checkbox"]',
+        "label"
+      ].join(",")
+    );
+    const controls = [];
+    const seen = /* @__PURE__ */ new Set();
+    for (const candidate of candidates) {
+      if (!isViewedLabel(candidate)) {
+        continue;
+      }
+      let control = candidate;
+      if (candidate instanceof HTMLLabelElement) {
+        control = candidate.control || candidate.querySelector('input[type="checkbox"]') || (candidate.htmlFor ? document.getElementById(candidate.htmlFor) : null);
+      }
+      if (!control || seen.has(control) || typeof control.click !== "function") {
+        continue;
+      }
+      seen.add(control);
+      controls.push(control);
+    }
+    return controls;
+  }
+  const DEFAULT_BATCH_SIZE = 10;
+  const BATCH_PAUSE_MS = 750;
+  function pauseBetweenBatches() {
+    return new Promise((resolve) => window.setTimeout(resolve, BATCH_PAUSE_MS));
+  }
+  async function setViewedControlsInBatches(controls, viewed, batchSize = DEFAULT_BATCH_SIZE, pause = pauseBetweenBatches) {
+    const pending = controls.filter((control) => {
+      const current = viewedState(control);
+      return current !== null && current !== viewed;
+    });
+    let changed = 0;
+    for (let offset = 0; offset < pending.length; offset += batchSize) {
+      const batch = pending.slice(offset, offset + batchSize);
+      for (const control of batch) {
+        control.click();
+        changed += 1;
+      }
+      if (offset + batchSize < pending.length) {
+        await pause();
+      }
+    }
+    return changed;
+  }
+  function setAllViewed(viewed, root = document) {
+    return setViewedControlsInBatches(findViewedControls(root), viewed);
+  }
+  const CONTROLS_ID = "nice-github-viewed-controls";
+  const STYLE_ID = "nice-github-viewed-controls-style";
+  let mutating = false;
+  let busy = false;
+  function injectStyle() {
+    if (document.getElementById(STYLE_ID)) {
+      return;
+    }
+    const style = document.createElement("style");
+    style.id = STYLE_ID;
+    style.textContent = [
+      "#" + CONTROLS_ID + "{display:inline-flex;align-items:center;gap:4px;margin-inline:8px;}",
+      "#" + CONTROLS_ID + " button{",
+      "height:28px;padding:0 8px;border:1px solid var(--button-default-borderColor-rest,var(--borderColor-default,#d1d9e0));",
+      "border-radius:6px;background:var(--button-default-bgColor-rest,var(--bgColor-default,#f6f8fa));",
+      "color:var(--button-default-fgColor-rest,var(--fgColor-default,#1f2328));font:inherit;font-size:12px;font-weight:500;cursor:pointer;",
+      "}",
+      "#" + CONTROLS_ID + " button:hover:not(:disabled){background:var(--button-default-bgColor-hover,var(--bgColor-muted,#f3f4f6));}",
+      "#" + CONTROLS_ID + " button:disabled{opacity:.5;cursor:default;}"
+    ].join("");
+    (document.head || document.documentElement).appendChild(style);
+  }
+  function findViewedCount() {
+    if (!document.body) {
+      return null;
+    }
+    const walker = document.createTreeWalker(document.body, NodeFilter.SHOW_TEXT);
+    while (walker.nextNode()) {
+      const node = walker.currentNode;
+      if (parseViewedCount(node.textContent)) {
+        return node.parentElement;
+      }
+    }
+    return null;
+  }
+  function syncButtons() {
+    const viewAll = document.querySelector("#" + CONTROLS_ID + ' [data-action="view-all"]');
+    const unviewAll = document.querySelector("#" + CONTROLS_ID + ' [data-action="unview-all"]');
+    if (!viewAll || !unviewAll) {
+      return;
+    }
+    if (busy) {
+      viewAll.disabled = true;
+      unviewAll.disabled = true;
+      return;
+    }
+    const count = parseViewedCount(findViewedCount()?.textContent);
+    viewAll.disabled = !count || count.total === 0 || count.viewed >= count.total;
+    unviewAll.disabled = !count || count.viewed === 0;
+  }
+  function makeButton(label, action, viewed) {
+    const button = document.createElement("button");
+    button.type = "button";
+    button.textContent = label;
+    button.setAttribute("data-action", action);
+    button.addEventListener("click", async (event) => {
+      event.preventDefault();
+      event.stopPropagation();
+      if (busy) {
+        return;
+      }
+      busy = true;
+      const originalLabel = button.textContent;
+      button.textContent = viewed ? "Viewing…" : "Un-viewing…";
+      syncButtons();
+      try {
+        await setAllViewed(viewed);
+      } finally {
+        button.textContent = originalLabel;
+        busy = false;
+        syncButtons();
+      }
+    });
+    return button;
+  }
+  function injectControls() {
+    if (document.getElementById(CONTROLS_ID)) {
+      syncButtons();
+      return;
+    }
+    const count = findViewedCount();
+    if (!count?.parentElement) {
+      return;
+    }
+    const controls = document.createElement("span");
+    controls.id = CONTROLS_ID;
+    controls.setAttribute("aria-label", "Bulk file viewed controls");
+    controls.appendChild(makeButton("View all", "view-all", true));
+    controls.appendChild(makeButton("Un-view all", "unview-all", false));
+    mutating = true;
+    count.after(controls);
+    mutating = false;
+    syncButtons();
+  }
+  function bootViewedFiles() {
+    injectStyle();
+    injectControls();
+    new MutationObserver(() => {
+      if (!mutating) {
+        injectControls();
+      }
+    }).observe(document.documentElement || document, {
+      attributes: true,
+      attributeFilter: ["aria-checked", "aria-pressed", "checked", "data-state"],
       childList: true,
       subtree: true
     });
@@ -1470,6 +1701,7 @@ var NiceGithubContent = (function(exports) {
   bootContent();
   bootFileFilters();
   bootFileMenu();
+  bootViewedFiles();
   exports.bootContent = bootContent;
   Object.defineProperty(exports, Symbol.toStringTag, { value: "Module" });
   return exports;

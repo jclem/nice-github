@@ -79,3 +79,10 @@ test("hiddenCountLabel covers each hide type", () => {
   assert.equal(filters.hiddenCountLabel("renamed", 1), "1 rename-only file hidden");
   assert.equal(filters.hiddenCountLabel("glob", 3, "*.snap"), "3 *.snap hidden");
 });
+
+test("tree directories hide only when every descendant file is hidden", () => {
+  assert.equal(filters.allTreeLeavesHidden([]), false);
+  assert.equal(filters.allTreeLeavesHidden([true]), true);
+  assert.equal(filters.allTreeLeavesHidden([true, true, true]), true);
+  assert.equal(filters.allTreeLeavesHidden([true, false, true]), false);
+});

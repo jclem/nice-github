@@ -197,7 +197,7 @@ function isRenameOnlyCard(card: Element | null) {
   return !hasHunks;
 }
 
-function isTreeLeaf(item: Element | null): item is Element {
+function isTreeLeaf(item: Element | null): boolean {
   return Boolean(item && !item.querySelector('[role="treeitem"]'));
 }
 
@@ -216,7 +216,7 @@ function treeItemForPath(path: string): Element | null {
     return null;
   }
   const item = document.getElementById(path);
-  return isTreeLeaf(item) ? item : null;
+  return item && isTreeLeaf(item) ? item : null;
 }
 
 function hidePair(treeItem: Element | null, card: Element | null) {
@@ -257,6 +257,20 @@ function anyFilterOn() {
   );
 }
 
+function hideEmptyTreeDirectories(scope: ParentNode | Document) {
+  const items = scope.querySelectorAll('#pr-file-tree li[role="treeitem"]');
+  for (const item of items) {
+    if (isTreeLeaf(item)) {
+      continue;
+    }
+
+    const leaves = [...item.querySelectorAll('li[role="treeitem"]')].filter(isTreeLeaf);
+    if (filters.allTreeLeavesHidden(leaves.map((leaf) => leaf.classList.contains(HIDDEN_CLASS)))) {
+      item.classList.add(HIDDEN_CLASS);
+    }
+  }
+}
+
 function applyFilters(root?: ParentNode | Document | null) {
   const repo = currentRepo();
   if (repo !== lastRepo) {
@@ -294,6 +308,8 @@ function applyFilters(root?: ParentNode | Document | null) {
       hidePair(item, card);
     }
   }
+
+  hideEmptyTreeDirectories(scope);
 
   renderHiddenSummary();
 }
@@ -875,5 +891,3 @@ export function bootFileFilters() {
     });
   }
 }
-
-

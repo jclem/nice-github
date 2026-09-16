@@ -30,6 +30,7 @@ adds an editable path pattern for this repo (typed in the menu; there is no
 `window.prompt`). Each glob is its own line with an × to remove it. Tests
 match `*.test.*` and `_test.*`. Generated files are ones GitHub already marks
 as generated. Every hide option defaults off and is stored per repository.
+Directories with no visible changed files are hidden from the file tree too.
 
 When files are hidden, the PR file tree shows a count for each type. Clicking
 the × on a count turns that filter off (or removes that glob) and shows those
@@ -40,6 +41,9 @@ Each file's overflow menu also gets **Copy path** and **Copy permalink**.
 Each file's overflow menu (the `...` next to Viewed) also gets **Last commit**,
 which opens the most recent commit that modified that file on the pull request
 head.
+
+The Files changed toolbar also gets **View all** and **Un-view all** buttons for
+marking every file's existing GitHub Viewed toggle at once.
 
 The global site header hides Copilot, Agents, Create new, Issues, Pull
 requests, and Repositories. Search, inbox, and the avatar stay. On a

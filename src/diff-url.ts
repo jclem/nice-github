@@ -1,13 +1,21 @@
 const PR_FILES_PATH = /^\/[^/]+\/[^/]+\/pull\/\d+\/(?:changes|files)\/?$/;
 
+function parseUrl(value: string | URL): URL | null {
+  try {
+    return new URL(value instanceof URL ? value.href : value);
+  } catch {
+    return null;
+  }
+}
+
 export function isPullRequestFilesUrl(value: string | URL): boolean {
-  const url = value instanceof URL ? value : new URL(value);
-  return url.hostname === "github.com" && PR_FILES_PATH.test(url.pathname);
+  const url = parseUrl(value);
+  return url !== null && url.hostname === "github.com" && PR_FILES_PATH.test(url.pathname);
 }
 
 export function withWhitespaceHidden(value: string | URL): string | null {
-  const url = value instanceof URL ? new URL(value.href) : new URL(value);
-  if (!isPullRequestFilesUrl(url) || url.searchParams.has("w")) {
+  const url = parseUrl(value);
+  if (url === null || !isPullRequestFilesUrl(url) || url.searchParams.has("w")) {
     return null;
   }
   url.searchParams.set("w", "1");
