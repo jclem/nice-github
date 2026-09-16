@@ -362,6 +362,7 @@ var NiceGithubContent = (function(exports) {
     }
     if (card) {
       card.classList.add(HIDDEN_CLASS);
+      card.closest('[class*="PullRequestDiffsList-module__diffEntry"]')?.classList.add(HIDDEN_CLASS);
     }
   }
   function shouldHide(path, card, treeItem) {

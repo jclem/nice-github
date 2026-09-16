@@ -225,6 +225,7 @@ function hidePair(treeItem: Element | null, card: Element | null) {
   }
   if (card) {
     card.classList.add(HIDDEN_CLASS);
+    card.closest('[class*="PullRequestDiffsList-module__diffEntry"]')?.classList.add(HIDDEN_CLASS);
   }
 }
 
