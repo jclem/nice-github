@@ -1,5 +1,8 @@
 # Nice GitHub
 
+> [!NOTE]
+> Proudly 100% AI Slop
+
 A small Manifest V3 Chrome extension for GitHub pull-request reviews.
 
 TypeScript sources live in `src/`. Vite bundles them into `dist/` as two IIFE
