@@ -5,10 +5,12 @@ const HEADER = ':is(header.GlobalNav, header.AppHeader, header[role="banner"])';
 /** CSS that hides crossed-out global-header chrome and the repo Agents tab. */
 export const CHROME_HIDE_CSS = [
   /* Copilot link + caret (hashed BEM suffix omitted). */
-  `${HEADER} [class*="CopilotItems-module__Wrapper"]:has(a[href="/copilot"])`,
-  `${HEADER} .AppHeader-CopilotChat`,
+  '[class*="CopilotItems-module__Wrapper"]',
+  ".AppHeader-CopilotChat",
   `${HEADER} a[href="/copilot"]`,
-  `${HEADER} button[class*="CopilotItems-module__CopilotMenu"]`,
+  'button[aria-label^="Open Copilot"]',
+  'button[class*="CopilotItems-module__CopilotMenu"]',
+  "button:has(svg.octicon-copilot)",
 
   /* Agents (cloud / lightning) */
   `${HEADER} [class*="CopilotItems-module__Wrapper"]:has(#global-copilot-agent-button)`,
@@ -34,7 +36,8 @@ export const CHROME_HIDE_CSS = [
   'nav[aria-label="Repository"] li:has(svg.octicon-agent)',
 ]
   .map((selector) => selector + "{display:none !important;}")
-  .join("");
+  .join("") +
+  ".nice-github-merge-summary-container{align-self:center !important;}";
 
 export function bootChromeHide(): void {
   if (document.getElementById(CHROME_HIDE_STYLE_ID)) {

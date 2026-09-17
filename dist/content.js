@@ -4,10 +4,12 @@ var NiceGithubContent = (function(exports) {
   const HEADER = ':is(header.GlobalNav, header.AppHeader, header[role="banner"])';
   const CHROME_HIDE_CSS = [
     /* Copilot link + caret (hashed BEM suffix omitted). */
-    `${HEADER} [class*="CopilotItems-module__Wrapper"]:has(a[href="/copilot"])`,
-    `${HEADER} .AppHeader-CopilotChat`,
+    '[class*="CopilotItems-module__Wrapper"]',
+    ".AppHeader-CopilotChat",
     `${HEADER} a[href="/copilot"]`,
-    `${HEADER} button[class*="CopilotItems-module__CopilotMenu"]`,
+    'button[aria-label^="Open Copilot"]',
+    'button[class*="CopilotItems-module__CopilotMenu"]',
+    "button:has(svg.octicon-copilot)",
     /* Agents (cloud / lightning) */
     `${HEADER} [class*="CopilotItems-module__Wrapper"]:has(#global-copilot-agent-button)`,
     `${HEADER} #global-copilot-agent-button`,
@@ -27,7 +29,7 @@ var NiceGithubContent = (function(exports) {
     'nav[aria-label="Repository"] li:has(> a[data-tab-item="agents"])',
     'nav[aria-label="Repository"] li:has(> a[data-react-nav="repo-agents"])',
     'nav[aria-label="Repository"] li:has(svg.octicon-agent)'
-  ].map((selector) => selector + "{display:none !important;}").join("");
+  ].map((selector) => selector + "{display:none !important;}").join("") + ".nice-github-merge-summary-container{align-self:center !important;}";
   function bootChromeHide() {
     if (document.getElementById(CHROME_HIDE_STYLE_ID)) {
       return;
@@ -1433,6 +1435,41 @@ var NiceGithubContent = (function(exports) {
       subtree: true
     });
   }
+  const BRANCHES = '[class*="PullRequestHeaderBranches-module__branches"]';
+  const PROCESSED = "data-nice-github-branches";
+  function simplifyPullRequestHeaders(root = document) {
+    root.querySelectorAll(BRANCHES).forEach((branches) => {
+      if (!(branches instanceof HTMLElement) || branches.hasAttribute(PROCESSED)) {
+        return;
+      }
+      const base = branches.querySelector(":scope > a");
+      const head = branches.querySelector(":scope > div");
+      const baseTooltip = base?.nextElementSibling;
+      if (!(base instanceof HTMLAnchorElement) || !(head instanceof HTMLElement)) {
+        return;
+      }
+      head.querySelector("button")?.remove();
+      head.querySelector('[aria-label="Copy head branch name to clipboard"]')?.remove();
+      const arrow = document.createElement("span");
+      arrow.setAttribute("aria-hidden", "true");
+      arrow.textContent = "←";
+      branches.replaceChildren(head, arrow, base);
+      if (baseTooltip instanceof HTMLElement) {
+        branches.append(baseTooltip);
+      }
+      const summary = branches.parentElement;
+      if (summary) {
+        for (const node of Array.from(summary.childNodes)) {
+          if (node.nodeType === Node.TEXT_NODE && node.textContent?.includes("wants to merge")) {
+            node.remove();
+          }
+        }
+        summary.classList.add("nice-github-merge-summary");
+        summary.parentElement?.classList.add("nice-github-merge-summary-container");
+      }
+      branches.setAttribute(PROCESSED, "true");
+    });
+  }
   function normalizedLabel(element) {
     const direct = (element.getAttribute("aria-label") || element.getAttribute("title") || element.textContent || "").replace(/\s+/g, " ").trim();
     if (direct) {
@@ -1662,6 +1699,7 @@ var NiceGithubContent = (function(exports) {
   }
   function bootContent() {
     enforceWhitespaceHidden();
+    simplifyPullRequestHeaders();
     rewriteDiffLinks();
     document.addEventListener(
       "click",
@@ -1688,14 +1726,17 @@ var NiceGithubContent = (function(exports) {
           }
         }
       }
+      simplifyPullRequestHeaders();
     }).observe(document.documentElement || document, { childList: true, subtree: true });
     document.addEventListener("turbo:load", () => {
       enforceWhitespaceHidden();
       rewriteDiffLinks();
+      simplifyPullRequestHeaders();
     });
     document.addEventListener("pjax:end", () => {
       enforceWhitespaceHidden();
       rewriteDiffLinks();
+      simplifyPullRequestHeaders();
     });
   }
   bootChromeHide();

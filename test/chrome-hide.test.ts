@@ -4,6 +4,8 @@ import { CHROME_HIDE_CSS } from "../src/chrome-hide";
 
 test("hides Copilot, Agents, and Create new in the site header", () => {
   assert.match(CHROME_HIDE_CSS, /header[\s\S]*href="\/copilot"/);
+  assert.match(CHROME_HIDE_CSS, /button\[aria-label\^="Open Copilot"\]/);
+  assert.match(CHROME_HIDE_CSS, /button:has\(svg\.octicon-copilot\)/);
   assert.match(CHROME_HIDE_CSS, /#global-copilot-agent-button/);
   assert.match(CHROME_HIDE_CSS, /GlobalCreateMenu-module__actionMenuButton/);
 });

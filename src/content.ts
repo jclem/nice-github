@@ -2,6 +2,7 @@ import { bootChromeHide } from "./chrome-hide";
 import { withWhitespaceHidden } from "./diff-url";
 import { bootFileFilters } from "./file-filters-ui";
 import { bootFileMenu } from "./last-commit-ui";
+import { simplifyPullRequestHeaders } from "./pull-request-header";
 import { bootViewedFiles } from "./viewed-files-ui";
 
 function rewriteLink(link: HTMLAnchorElement): void {
@@ -32,6 +33,7 @@ function enforceWhitespaceHidden(): void {
 export function bootContent(): void {
   // This is the earliest guard for direct loads.
   enforceWhitespaceHidden();
+  simplifyPullRequestHeaders();
 
   // GitHub normally uses Turbo to transition between PR tabs. Point its link at
   // the final URL before the click, rather than redirecting after navigation.
@@ -62,15 +64,18 @@ export function bootContent(): void {
         }
       }
     }
+    simplifyPullRequestHeaders();
   }).observe(document.documentElement || document, { childList: true, subtree: true });
 
   document.addEventListener("turbo:load", () => {
     enforceWhitespaceHidden();
     rewriteDiffLinks();
+    simplifyPullRequestHeaders();
   });
   document.addEventListener("pjax:end", () => {
     enforceWhitespaceHidden();
     rewriteDiffLinks();
+    simplifyPullRequestHeaders();
   });
 }
 
