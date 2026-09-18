@@ -1,7 +1,7 @@
 const BRANCHES = '[class*="PullRequestHeaderBranches-module__branches"]';
 const PROCESSED = "data-nice-github-branches";
 
-/** Replaces GitHub's merge sentence with `head ← base` branch links. */
+/** Replaces GitHub's merge sentence with `base ← head` branch links. */
 export function simplifyPullRequestHeaders(root: ParentNode = document): void {
   root.querySelectorAll(BRANCHES).forEach((branches) => {
     if (!(branches instanceof HTMLElement) || branches.hasAttribute(PROCESSED)) {
@@ -24,7 +24,7 @@ export function simplifyPullRequestHeaders(root: ParentNode = document): void {
     arrow.setAttribute("aria-hidden", "true");
     arrow.textContent = "←";
 
-    branches.replaceChildren(head, arrow, base);
+    branches.replaceChildren(base, arrow, head);
     if (baseTooltip instanceof HTMLElement) {
       branches.append(baseTooltip);
     }

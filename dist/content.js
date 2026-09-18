@@ -1453,7 +1453,7 @@ var NiceGithubContent = (function(exports) {
       const arrow = document.createElement("span");
       arrow.setAttribute("aria-hidden", "true");
       arrow.textContent = "←";
-      branches.replaceChildren(head, arrow, base);
+      branches.replaceChildren(base, arrow, head);
       if (baseTooltip instanceof HTMLElement) {
         branches.append(baseTooltip);
       }
