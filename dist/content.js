@@ -1448,8 +1448,6 @@ var NiceGithubContent = (function(exports) {
       if (!(base instanceof HTMLAnchorElement) || !(head instanceof HTMLElement)) {
         return;
       }
-      head.querySelector("button")?.remove();
-      head.querySelector('[aria-label="Copy head branch name to clipboard"]')?.remove();
       const arrow = document.createElement("span");
       arrow.setAttribute("aria-hidden", "true");
       arrow.textContent = "←";

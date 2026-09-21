@@ -15,11 +15,6 @@ export function simplifyPullRequestHeaders(root: ParentNode = document): void {
       return;
     }
 
-    // The copy control is specific to GitHub's verbose header and would break
-    // the compact branch-to-branch presentation.
-    head.querySelector("button")?.remove();
-    head.querySelector('[aria-label="Copy head branch name to clipboard"]')?.remove();
-
     const arrow = document.createElement("span");
     arrow.setAttribute("aria-hidden", "true");
     arrow.textContent = "←";
