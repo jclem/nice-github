@@ -168,6 +168,7 @@ var NiceGithubContent = (function(exports) {
   }
   const HIDDEN_CLASS = "nice-github-hidden-file";
   const ITEM_ATTR$1 = "data-nice-github-filter";
+  const GROUP_ATTR = "data-nice-github-filter-group";
   const SUMMARY_ID = "nice-github-hidden-summary";
   const state = normalizeRepoSettings();
   let mutating$2 = false;
@@ -659,14 +660,52 @@ var NiceGithubContent = (function(exports) {
   }
   function findHideWhitespaceItem(root) {
     const nodes = (root || document).querySelectorAll(
-      "[role='menuitemcheckbox'], [role='menuitemradio'], button"
+      "[role='menuitemcheckbox'], [role='menuitemradio']"
     );
     for (const node of nodes) {
-      if (itemLabel$1(node) === "Hide whitespace") {
+      if (node.closest('[role="menu"]') && itemLabel$1(node) === "Hide whitespace") {
         return node;
       }
     }
     return null;
+  }
+  function findNewSettingsMenu() {
+    for (const menu of document.querySelectorAll('ul[role="menu"]')) {
+      const label = menu.getAttribute("aria-labelledby")?.split(/\s+/)[0];
+      if (label && document.getElementById(label)?.textContent?.trim() === "Open diff view settings") {
+        return menu;
+      }
+    }
+    return null;
+  }
+  function findFilterMenu() {
+    const whitespace = findHideWhitespaceItem(document);
+    if (whitespace) {
+      const row = whitespace.closest("li");
+      if (row?.parentElement) {
+        return { list: row.parentElement, template: whitespace, anchor: row };
+      }
+    }
+    const menu = findNewSettingsMenu();
+    const template = menu?.querySelector('li[role="menuitemcheckbox"][data-component="ActionList.Item"]');
+    const sourceGroup = template?.closest('li[data-component="ActionList.Group"]');
+    if (!menu || !template || !sourceGroup) {
+      return null;
+    }
+    let group = menu.querySelector("[" + GROUP_ATTR + "]");
+    if (!group) {
+      group = sourceGroup.cloneNode(false);
+      group.setAttribute(GROUP_ATTR, "true");
+      const list2 = sourceGroup.querySelector('ul[role="group"]')?.cloneNode(false);
+      if (!list2) {
+        return null;
+      }
+      list2.setAttribute("aria-label", "File filters");
+      group.appendChild(list2);
+      menu.appendChild(group);
+    }
+    const list = group.querySelector('ul[role="group"]');
+    return list ? { list, template, anchor: null } : null;
   }
   function setItemChecked(item, checked) {
     const control = item.matches?.("[role='menuitemcheckbox']") ? item : item.querySelector?.("[role='menuitemcheckbox']") || item;
@@ -718,8 +757,10 @@ var NiceGithubContent = (function(exports) {
     const row = template.closest("li") || template.parentElement;
     const cloneRow = row.cloneNode(true);
     cloneRow.setAttribute(ITEM_ATTR$1, id);
+    cloneRow.removeAttribute("aria-keyshortcuts");
     retargetCloneIds$1(cloneRow);
     setCloneLabel$1(cloneRow, label);
+    cloneRow.querySelectorAll("kbd, [data-component='ActionList.Item.TrailingVisual']").forEach((node) => node.remove());
     const control = cloneRow.querySelector("[role='menuitemcheckbox']") || cloneRow;
     control.setAttribute(ITEM_ATTR$1, id);
     control.setAttribute("role", "menuitemcheckbox");
@@ -808,15 +849,11 @@ var NiceGithubContent = (function(exports) {
     return cloneRow;
   }
   function refreshGlobRows() {
-    const whitespace = findHideWhitespaceItem(document);
-    if (!whitespace) {
+    const host = findFilterMenu();
+    if (!host) {
       return;
     }
-    const list = (whitespace.closest("li") || whitespace.parentElement)?.parentElement ?? null;
-    if (!list) {
-      return;
-    }
-    syncGlobRows(list, whitespace);
+    syncGlobRows(host.list, host.template);
   }
   function syncGlobRows(list, template) {
     if (list.querySelector(".nice-github-glob-input:focus")) {
@@ -855,26 +892,22 @@ var NiceGithubContent = (function(exports) {
     );
   }
   function injectMenuItems$1() {
-    const whitespace = findHideWhitespaceItem(document);
-    if (!whitespace) {
+    const host = findFilterMenu();
+    if (!host) {
       return;
     }
-    const row = whitespace.closest("li") || whitespace.parentElement;
-    const list = row.parentElement;
-    if (!list) {
-      return;
-    }
+    const { list, template, anchor } = host;
     if (list.querySelector("[" + ITEM_ATTR$1 + '="hideTests"]')) {
       syncMenuChecks();
-      syncGlobRows(list, whitespace);
+      syncGlobRows(list, template);
       return;
     }
     mutating$2 = true;
-    const testsItem = makeFilterItem(whitespace, "hideTests", "Hide tests", state.hideTests, () => {
+    const testsItem = makeFilterItem(template, "hideTests", "Hide tests", state.hideTests, () => {
       setHide("hideTests", !state.hideTests);
     });
     const generatedItem = makeFilterItem(
-      whitespace,
+      template,
       "hideGenerated",
       "Hide generated files",
       state.hideGenerated,
@@ -883,7 +916,7 @@ var NiceGithubContent = (function(exports) {
       }
     );
     const deletedItem = makeFilterItem(
-      whitespace,
+      template,
       "hideDeleted",
       "Hide deleted files",
       state.hideDeleted,
@@ -892,7 +925,7 @@ var NiceGithubContent = (function(exports) {
       }
     );
     const renamedItem = makeFilterItem(
-      whitespace,
+      template,
       "hideRenameOnly",
       "Hide rename-only files",
       state.hideRenameOnly,
@@ -900,12 +933,16 @@ var NiceGithubContent = (function(exports) {
         setHide("hideRenameOnly", !state.hideRenameOnly);
       }
     );
-    row.after(renamedItem);
-    row.after(deletedItem);
-    row.after(generatedItem);
-    row.after(testsItem);
+    if (anchor) {
+      anchor.after(renamedItem);
+      anchor.after(deletedItem);
+      anchor.after(generatedItem);
+      anchor.after(testsItem);
+    } else {
+      list.append(testsItem, generatedItem, deletedItem, renamedItem);
+    }
     mutating$2 = false;
-    syncGlobRows(list, whitespace);
+    syncGlobRows(list, template);
   }
   function bootFileFilters() {
     injectStyle$1();
